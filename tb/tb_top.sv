@@ -16,6 +16,7 @@ module tb_top;
   logic       rempty;
 
   // Clock generation (wclk: 100 MHz, rclk: ~43 MHz)
+  // Inputs are driven #1 after each clock edge to avoid a race with DUT sampling.
   always #5 wclk = ~wclk;
   always #11.5 rclk = ~rclk;
 
@@ -46,6 +47,7 @@ module tb_top;
     // Fill the FIFO completely
     while (!wfull) begin
       @(posedge wclk);
+      #1;
       winc  = 1;
       wdata = $urandom_range(0, 15);
     end
@@ -55,11 +57,13 @@ module tb_top;
     // Force additional writes when full
     repeat (5) begin
       @(posedge wclk);
+      #1;
       winc  = 1;
       wdata = $urandom_range(0, 15);
     end
 
     @(posedge wclk);
+    #1;
     winc = 0;
     $display("[%0t] TEST: Scenario 1 completed.", $time);
   endtask
@@ -71,11 +75,13 @@ module tb_top;
     // Part A: Force reads while empty (Underflow test)
     repeat (5) begin
       @(posedge rclk);
+      #1;
       rinc = 1;
     end
     @(posedge rclk);
+    #1;
     rinc = 0;
-    $display("[%0t] TEST: Forced empty reads attempted (Underflow protection active).", $time);
+    $display("[%0t] TEST: Forced empty reads attempted (underflow protection expected; not auto-checked).", $time);
 
     #50;
 
@@ -87,10 +93,12 @@ module tb_top;
       begin
         repeat (15) begin
           @(posedge wclk);
+          #1;
           winc = (!wfull);
           if (winc) wdata = $urandom_range(0, 15);
         end
         @(posedge wclk);
+        #1;
         winc = 0;
       end
 
@@ -98,9 +106,11 @@ module tb_top;
       begin
         repeat (15) begin
           @(posedge rclk);
+          #1;
           rinc = (!rempty);
         end
         @(posedge rclk);
+        #1;
         rinc = 0;
       end
     join
@@ -115,10 +125,12 @@ module tb_top;
     // Write some initial data
     repeat (5) begin
       @(posedge wclk);
+      #1;
       winc  = 1;
       wdata = $urandom_range(0, 15);
     end
     @(posedge wclk);
+    #1;
     winc = 0;
 
     // Wait for an unaligned, random time interval
@@ -128,32 +140,36 @@ module tb_top;
     wrst_n = 0;
     #3;
     rrst_n = 0;
-    $display("[%0t] TEST: Reset injected. Pointers should drop to zero.", $time);
+    $display("[%0t] TEST: Reset injected. Pointers are expected to drop to zero.", $time);
 
     #25;  // Hold reset
 
     // Deassert resets
     wrst_n = 1;
     rrst_n = 1;
-    $display("[%0t] TEST: Power restored. System should recover smoothly.", $time);
+    $display("[%0t] TEST: Power restored. Resets released.", $time);
 
     #50;  // Wait for synchronizers to settle
 
     // Post-Reset Sanity Check
     $display("[%0t] TEST: Post-reset sanity check writing hex 'A'...", $time);
     @(posedge wclk);
+    #1;
     winc  = 1;
     wdata = 4'hA;
     @(posedge wclk);
+    #1;
     winc = 0;
 
     #100;
 
     @(posedge rclk);
+    #1;
     rinc = 1;
     @(posedge rclk);
+    #1;
     rinc = 0;
-    $display("[%0t] TEST: Scenario 3 completed. Core recovered successfully.", $time);
+    $display("[%0t] TEST: Scenario 3 completed. Check the waveform for recovery (no automatic check yet).", $time);
   endtask
 
   // Main Simulation Flow
